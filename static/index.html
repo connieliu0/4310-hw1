@@ -36,10 +36,13 @@
     <h1>HW1: Who owns the trees in SF and what are the planting patterns?</h1>
     <div class="row">
       <p>
-        I found two main players in the SF tree space - private owners and DPW
-        (Department of Public Works). Notice trends in where each plants, the
-        number of trees each plants per location, the type of site, and the plot
-        size!
+        I found two main caretakers in the SF tree space - private owners and
+        DPW (Department of Public Works). Notice trends in where each tree
+        resides, the number of trees per location, the type of site, and the
+        plot size! The main aim is to understand the distribution of mature and
+        young trees - who owns larger, older trees? Who owns younger ones? Who
+        owns the majority of trees in SF? Ultimately, we will find the answer to
+        who is dictating the forestation of SF.
       </p>
     </div>
     <div class="row">
@@ -60,7 +63,7 @@
     const colorScale1 = d3
       .scaleOrdinal()
       .domain(careTaker)
-      .range(d3.schemeSet2);
+      .range(["#ffa666", "#8f9eff"]);
     const svg = d3.select("svg#map");
     const width = svg.attr("width");
     const height = svg.attr("height");
@@ -76,21 +79,17 @@
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
     const requestData = async function () {
-      //CSV dataset of trees
       const trees = await d3.csv(
         "./Street_Tree_List-2022-01-30_ALL.csv",
         d3.autoType
       );
       const dbhExtent = d3.extent(trees, (d) => d.DBH);
       const colorScale = d3.scaleOrdinal(d3.schemeGreens[9]);
-      // a GeoJSON dataset of police precincts in NYC
       const sf = await d3.json("./SF-Neighborhoods.geo.json");
       var neighborhoods = topojson.feature(sf, sf.objects.SFNeighborhoods);
-
       var projection = d3.geoMercator().fitSize([width, height], neighborhoods);
       var path = d3.geoPath().projection(projection);
       trees.forEach((d) => {
-        // Use the projection just like a scale to convert from lng/lat to pixels
         d.Position = projection([d.Longitude, d.Latitude]);
       });
       svg
@@ -113,7 +112,6 @@
         .attr("fill", (d) => colorScale1(d.qCaretaker))
         .attr("opacity", 0.4);
       //GRAPH 1
-
       const scat = d3.select("#scatter");
       const swidth = scat.attr("width");
       const sheight = scat.attr("height");
@@ -150,6 +148,7 @@
         )
         .style("text-anchor", "middle")
         .text("Site Order");
+      // legend source: https://www.d3-graph-gallery.com/graph/custom_legend.html
       svglegend = d3.select("#scatlegend");
       svglegend
         .selectAll("mydots")
@@ -206,7 +205,7 @@
         .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
         .call(leftGridlines);
 
-      let bottomAxis = d3.axisBottom(xScale); // exact value without commas
+      let bottomAxis = d3.axisBottom(xScale);
       let bottomGridlines = d3
         .axisBottom(xScale)
         .tickSize(-chartHeight - 10)
@@ -360,7 +359,7 @@
         .attr("class", "y gridlines")
         .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
         .call(leftGridlines2);
-      let bottomAxis2 = d3.axisBottom(xScale2); // exact value without commas
+      let bottomAxis2 = d3.axisBottom(xScale2);
       let bottomGridlines2 = d3
         .axisBottom(xScale2)
         .tickSize(-chartHeight - 10)
@@ -404,7 +403,7 @@
             ")"
         )
         .style("text-anchor", "middle")
-        .text("Plot Size");
+        .text("Plot Size Width (feet)");
       chartArea2
         .append("text")
         .attr("id", "label")
