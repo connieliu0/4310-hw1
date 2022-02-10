@@ -21,6 +21,11 @@ def passes_filter(row):
     #   Only trees that have a DBH provided
     elif len(row['DBH']) < 1:
         return False
+    #only trees with a width
+    elif len(row['PlotSize']) ==0:
+        return False
+    elif "X" not in row['PlotSize'] and "x" not in row['PlotSize'] and "Width" not in row['PlotSize']:
+        return False
     else:
         return True
     
@@ -37,12 +42,23 @@ with open('Street_Tree_List-2022-01-30_RAW.csv','r') as f:
         if passes_filter(row):
             # you might consider doing some additional processing here
             # e.g. splitting up qSpecies
+            string = row['PlotSize']
+            if "x" in string:
+                row['PlotSize'] = string[0]
+            elif "X" in string:
+                row['PlotSize'] = string[0]
+            elif len(string)==9:
+                row['PlotSize'] = string[6]
+            elif len(string)==10:
+                row['PlotSize'] = string[6:8]
+            else:
+                row['PlotSize'] 
             data.append(row)
 
 print(len(data))
 
 # export to new CSV       
-with open('Street_Tree_List-2022-01-30_FILTERED.csv','w') as f:
+with open('Street_Tree_List-2022-01-30_WIDTHFILTER.csv','w') as f:
     writer = csv.DictWriter(f, fieldnames=header)
     writer.writeheader()
     writer.writerows(data)

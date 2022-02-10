@@ -1,0 +1,420 @@
+<html>
+  <head>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+  </head>
+  <style>
+    .gridlines line {
+      stroke: #bbb;
+    }
+
+    .gridlines .domain {
+      stroke: none;
+    }
+    .row {
+      display: flex;
+      flex-direction: row;
+    }
+    .row svg {
+      margin: 10px;
+    }
+    .col {
+      display: flex;
+      flex-direction: column;
+    }
+    h1 {
+      text-align: center;
+    }
+    h3 {
+      text-align: center;
+    }
+    body {
+      font-family: Optima, sans-serif;
+    }
+  </style>
+  <body>
+    <h1>HW1: Who owns the trees in SF and what are the planting patterns?</h1>
+    <div class="row">
+      <p>
+        I found two main players in the SF tree space - private owners and DPW
+        (Department of Public Works). Notice trends in where each plants, the
+        number of trees each plants per location, the type of site, and the plot
+        size!
+      </p>
+    </div>
+    <div class="row">
+      <svg id="map" width="400" height="400"></svg>
+      <div class="col">
+        <p>Legend:</p>
+        <svg id="scatlegend" width="80" height="80"></svg>
+        <div class="row">
+          <svg id="scatter" width="280" height="280"></svg>
+          <svg id="scatter1" width="280" height="280"></svg>
+          <svg id="scatter2" width="280" height="280"></svg>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script>
+    var careTaker = ["DPW", "Private"];
+    const colorScale1 = d3
+      .scaleOrdinal()
+      .domain(careTaker)
+      .range(d3.schemeSet2);
+    const svg = d3.select("svg#map");
+    const width = svg.attr("width");
+    const height = svg.attr("height");
+    const margin = { top: 0, right: 20, bottom: 20, left: 20 };
+    const mapWidth = width - margin.left - margin.right;
+    const mapHeight = height - margin.top - margin.bottom;
+    const map = svg
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    const outlines = svg
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    const requestData = async function () {
+      //CSV dataset of trees
+      const trees = await d3.csv(
+        "./Street_Tree_List-2022-01-30_ALL.csv",
+        d3.autoType
+      );
+      const dbhExtent = d3.extent(trees, (d) => d.DBH);
+      const colorScale = d3.scaleOrdinal(d3.schemeGreens[9]);
+      // a GeoJSON dataset of police precincts in NYC
+      const sf = await d3.json("./SF-Neighborhoods.geo.json");
+      var neighborhoods = topojson.feature(sf, sf.objects.SFNeighborhoods);
+
+      var projection = d3.geoMercator().fitSize([width, height], neighborhoods);
+      var path = d3.geoPath().projection(projection);
+      trees.forEach((d) => {
+        // Use the projection just like a scale to convert from lng/lat to pixels
+        d.Position = projection([d.Longitude, d.Latitude]);
+      });
+      svg
+        .selectAll("path.neighborhoods")
+        .data(neighborhoods.features)
+        .join("path")
+        .attr("class", "neighborhoods")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1)
+        .attr("fill", "gray")
+        .attr("d", path);
+      svg
+        .selectAll("circle")
+        .data(trees)
+        .join("circle")
+        .attr("cx", (d) => d.Position[0])
+        .attr("cy", (d) => d.Position[1])
+        .attr("r", 2)
+        .style("border", "none")
+        .attr("fill", (d) => colorScale1(d.qCaretaker))
+        .attr("opacity", 0.4);
+      //GRAPH 1
+
+      const scat = d3.select("#scatter");
+      const swidth = scat.attr("width");
+      const sheight = scat.attr("height");
+      const smargin = { top: 10, right: 10, bottom: 50, left: 50 };
+      const chartWidth = swidth - smargin.left - smargin.right;
+      const chartHeight = sheight - smargin.top - smargin.bottom;
+      let annotations = scat.append("g").attr("id", "annotations");
+      let chartArea = scat
+        .append("g")
+        .attr("id", "points")
+        .attr(
+          "transform",
+          "translate(" + smargin.left + "," + smargin.top + ")"
+        );
+      chartArea
+        .append("text")
+        .attr("id", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - 55)
+        .attr("x", 0 - chartHeight / 2)
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .text("Diameter at breast height (DBH)");
+      chartArea
+        .append("text")
+        .attr("id", "label")
+        .attr(
+          "transform",
+          "translate(" +
+            width / 3 +
+            " ," +
+            (chartHeight + margin.top + 50) +
+            ")"
+        )
+        .style("text-anchor", "middle")
+        .text("Site Order");
+      svglegend = d3.select("#scatlegend");
+      svglegend
+        .selectAll("mydots")
+        .data(careTaker)
+        .enter()
+        .append("circle")
+        .attr("cx", 10)
+        .attr("cy", function (d, i) {
+          return 10 + i * 25;
+        })
+        .attr("r", 7)
+        .style("fill", function (d) {
+          return colorScale1(d);
+        });
+      svglegend
+        .selectAll("mylabels")
+        .data(careTaker)
+        .enter()
+        .append("text")
+        .attr("x", 30)
+        .attr("y", function (d, i) {
+          return 10 + i * 25;
+        })
+        .style("fill", function (d) {
+          return colorScale1(d);
+        })
+        .text(function (d) {
+          return d;
+        })
+        .attr("text-anchor", "left")
+        .style("alignment-baseline", "middle");
+      const widthExtent = d3.extent(trees, (d) => d["DBH"]);
+      const widthScale = d3
+        .scaleLinear()
+        .domain(widthExtent)
+        .range([chartHeight, 0]);
+
+      const xExtent = d3.extent(trees, (d) => d["SiteOrder"]);
+      const xScale = d3.scaleLinear().domain(xExtent).range([0, chartWidth]);
+
+      let leftAxis = d3.axisLeft(widthScale);
+      let leftGridlines = d3
+        .axisLeft(widthScale)
+        .tickSize(-chartWidth - 10)
+        .tickFormat("");
+      annotations
+        .append("g")
+        .attr("class", "y axis")
+        .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
+        .call(leftAxis);
+      annotations
+        .append("g")
+        .attr("class", "y gridlines")
+        .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
+        .call(leftGridlines);
+
+      let bottomAxis = d3.axisBottom(xScale); // exact value without commas
+      let bottomGridlines = d3
+        .axisBottom(xScale)
+        .tickSize(-chartHeight - 10)
+        .tickFormat("");
+      annotations
+        .append("g")
+        .attr("class", "x axis")
+        .attr(
+          "transform",
+          `translate(${smargin.left},${chartHeight + smargin.top + 10})`
+        )
+        .call(bottomAxis);
+      annotations
+        .append("g")
+        .attr("class", "x gridlines")
+        .attr(
+          "transform",
+          `translate(${smargin.left},${chartHeight + smargin.top + 10})`
+        )
+        .call(bottomGridlines);
+
+      let circles = chartArea
+        .selectAll("circle.point")
+        .data(trees)
+        .join("circle")
+        .attr("class", "point")
+        .attr("opacity", 0.4)
+        .attr("cx", (d) => xScale(d["SiteOrder"]))
+        .attr("cy", (d) => widthScale(d["DBH"]))
+        .attr("r", 3)
+        .attr("fill", (d) => colorScale1(d["qCaretaker"]));
+
+      //GRAPH 2
+      const scat1 = d3.select("#scatter1");
+      let annotations1 = scat1.append("g").attr("id", "annotations");
+      let chartArea1 = scat1
+        .append("g")
+        .attr("id", "points")
+        .attr(
+          "transform",
+          "translate(" + smargin.left + "," + smargin.top + ")"
+        );
+
+      const widthExtent1 = d3.extent(trees, (d) => d["DBH"]);
+      const widthScale1 = d3
+        .scaleLinear()
+        .domain([0, widthExtent1[1]])
+        .range([chartHeight, 0]);
+      sitelist = ["Curbside Yard", "Back Yard", "Cutout", "Pot"];
+      const xScale1 = d3.scalePoint().domain(sitelist).range([0, chartWidth]);
+      let leftAxis1 = d3.axisLeft(widthScale);
+      let leftGridlines1 = d3
+        .axisLeft(widthScale)
+        .tickSize(-chartWidth - 10)
+        .tickFormat("");
+      annotations1
+        .append("g")
+        .attr("class", "y axis")
+        .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
+        .call(leftAxis1);
+      annotations1
+        .append("g")
+        .attr("class", "y gridlines")
+        .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
+        .call(leftGridlines1);
+      let bottomAxis1 = d3.axisBottom(xScale1);
+      let bottomGridlines1 = d3
+        .axisBottom(xScale1)
+        .tickSize(-chartHeight - 10)
+        .tickFormat("");
+      annotations1
+        .append("g")
+        .attr("class", "x axis")
+        .attr(
+          "transform",
+          `translate(${smargin.left},${chartHeight + smargin.top + 10})`
+        )
+        .call(bottomAxis1);
+      annotations1
+        .append("g")
+        .attr("class", "x gridlines")
+        .attr(
+          "transform",
+          `translate(${smargin.left},${chartHeight + smargin.top + 10})`
+        )
+        .call(bottomGridlines1);
+
+      let circles1 = chartArea1
+        .selectAll("circle.point")
+        .data(trees)
+        .join("circle")
+        .attr("class", "point")
+        .attr("opacity", 0.3)
+        .attr("cx", (d) => xScale1(d["qSiteInfo"]))
+        .attr("cy", (d) => widthScale1(d["DBH"]))
+        .attr("r", 3)
+        .attr("fill", (d) => colorScale1(d["qCaretaker"]));
+      chartArea1
+        .append("text")
+        .attr("id", "label")
+        .attr(
+          "transform",
+          "translate(" +
+            width / 3 +
+            " ," +
+            (chartHeight + margin.top + 50) +
+            ")"
+        )
+        .style("text-anchor", "middle")
+        .text("Site Info");
+      chartArea1
+        .append("text")
+        .attr("id", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - 55)
+        .attr("x", 0 - chartHeight / 2)
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .text("Diameter at breast height (DBH)");
+      //SCATTER 3
+      const scat2 = d3.select("#scatter2");
+      let annotations2 = scat2.append("g").attr("id", "annotations2");
+      let chartArea2 = scat2
+        .append("g")
+        .attr("id", "points")
+        .attr(
+          "transform",
+          "translate(" + smargin.left + "," + smargin.top + ")"
+        );
+      const xExtent2 = d3.extent(trees, (d) => d["PlotSize"]);
+      const plots = d3.map(trees, (d) => d["PlotSize"]);
+      const xScale2 = d3.scaleLinear().domain(xExtent2).range([0, chartWidth]);
+      const plotExtent = d3.extent(trees, (d) => d["DBH"]);
+      const plotScale = d3
+        .scaleLinear()
+        .domain([0, plotExtent[1]])
+        .range([chartHeight, 0]);
+      console.log(xScale2);
+      let leftAxis2 = d3.axisLeft(plotScale);
+      let leftGridlines2 = d3
+        .axisLeft(plotScale)
+        .tickSize(-chartWidth - 10)
+        .tickFormat("");
+      annotations2
+        .append("g")
+        .attr("class", "y axis")
+        .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
+        .call(leftAxis2);
+      annotations2
+        .append("g")
+        .attr("class", "y gridlines")
+        .attr("transform", `translate(${smargin.left - 10},${smargin.top})`)
+        .call(leftGridlines2);
+      let bottomAxis2 = d3.axisBottom(xScale2); // exact value without commas
+      let bottomGridlines2 = d3
+        .axisBottom(xScale2)
+        .tickSize(-chartHeight - 10)
+        .tickFormat("");
+      annotations2
+        .append("g")
+        .attr("class", "x axis")
+        .attr(
+          "transform",
+          `translate(${smargin.left},${chartHeight + smargin.top + 10})`
+        )
+        .call(bottomAxis2);
+      annotations2
+        .append("g")
+        .attr("class", "x gridlines")
+        .attr(
+          "transform",
+          `translate(${smargin.left},${chartHeight + smargin.top + 10})`
+        )
+        .call(bottomGridlines2);
+
+      let circles2 = chartArea2
+        .selectAll("circle.point")
+        .data(trees)
+        .join("circle")
+        .attr("class", "point")
+        .attr("opacity", 0.3)
+        .attr("cx", (d) => xScale2(d["PlotSize"]))
+        .attr("cy", (d) => plotScale(d["DBH"]))
+        .attr("r", 3)
+        .attr("fill", (d) => colorScale1(d["qCaretaker"]));
+      chartArea2
+        .append("text")
+        .attr("id", "label")
+        .attr(
+          "transform",
+          "translate(" +
+            width / 3 +
+            " ," +
+            (chartHeight + margin.top + 50) +
+            ")"
+        )
+        .style("text-anchor", "middle")
+        .text("Plot Size");
+      chartArea2
+        .append("text")
+        .attr("id", "label")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 0 - 55)
+        .attr("x", 0 - chartHeight / 2)
+        .attr("dy", "1em")
+        .style("text-anchor", "middle")
+        .text("Diameter at breast height (DBH)");
+    };
+    requestData();
+  </script>
+</html>
